@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Telegram Bot Controller - Admin</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <style>
+    body{font-family: Arial; padding:20px}
+    input, button, select, textarea{margin:6px 0; display:block}
+    .robot{border:1px solid #ddd;padding:8px;margin:8px 0}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const e = React.createElement;
+    function App(){
+      const [robots, setRobots] = React.useState([]);
+      const [form, setForm] = React.useState({name:'', token:'', rate_limit:1});
+
+      function load(){
+        fetch('/api/robots').then(r=>r.json()).then(setRobots);
+      }
+      React.useEffect(()=>{load()},[]);
+
+      async function create(){
+        await fetch('/api/robots', {method:'POST',headers:{'content-type':'application/json'}, body: JSON.stringify(form)});
+        setForm({name:'', token:'', rate_limit:1});
+        load();
+      }
+
+      async function toggle(id, enabled){
+        await fetch(`/api/robots/${id}/toggle`, {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({enabled})});
+        load();
+      }
+
+      async function testSend(bot){
+        const chatId = prompt('chat id or channel (e.g. @channelusername)');
+        if(!chatId) return;
+        const text = prompt('message text');
+        await fetch('/api/control/send', {method:'POST',headers:{'content-type':'application/json'}, body: JSON.stringify({botId: bot.id, chatId, text})});
+        alert('queued');
+      }
+
+      return e('div', null,
+        e('h1', null, 'Bot 管理'),
+        e('div', null,
+          e('input', {placeholder:'name', value: form.name, onChange: (e)=>setForm({...form, name: e.target.value})}),
+          e('input', {placeholder:'token', value: form.token, onChange: (e)=>setForm({...form, token: e.target.value})}),
+          e('input', {placeholder:'rate_limit (msg/sec)', value: form.rate_limit, type:'number', onChange: (e)=>setForm({...form, rate_limit: parseFloat(e.target.value)})}),
+          e('button', {onClick: create}, '新增机器人')
+        ),
+        e('h2', null, '已配置机器人'),
+        robots.map(r => e('div', {key: r.id, className:'robot'},
+          e('div', null, e('strong', null, r.name), ' (', r.id, ')'),
+          e('div', null, 'enabled: ', r.enabled ? 'yes' : 'no'),
+          e('div', null, 'rate_limit: ', r.rate_limit),
+          e('button', {onClick: ()=>toggle(r.id, !r.enabled)}, r.enabled ? '下线' : '上线'),
+          e('button', {onClick: ()=>testSend(r)}, '测试发送')
+        ))
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+  </script>
+</body>
+</html>
