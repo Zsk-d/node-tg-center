@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS message_map (
 CREATE INDEX IF NOT EXISTS idx_message_map_bot_chat ON message_map(bot_id, chat_id);
 
 `);
+const initStatus = () =>{
+  // 1. 更新所有机器人为下线状态
+  db.prepare(`UPDATE robots SET enabled = 0`).run();
+}
+
+initStatus()
 
 module.exports = {
   db,

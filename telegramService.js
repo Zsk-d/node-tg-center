@@ -29,6 +29,7 @@ class RateLimiter {
     }
 }
 
+
 function getOrCreateBot(robotRecord, defaultRate) {
     if (!robotRecord || !robotRecord.token) throw new Error('invalid robot');
     if (bots.has(robotRecord.id)) return bots.get(robotRecord.id);
@@ -41,7 +42,9 @@ function getOrCreateBot(robotRecord, defaultRate) {
     bot._meta = {
         id: robotRecord.id,
         limiter: new RateLimiter(robotRecord.rate_limit || defaultRate || 1),
-        enabled: !!robotRecord.enabled
+        enabled: !!robotRecord.enabled,
+        listening: false,        // 添加监听状态标志
+        handlersSetup: false     // 添加处理器设置标志
     };
     bots.set(robotRecord.id, bot);
     return bot;
@@ -156,7 +159,168 @@ async function sendReaction(localId, emoji) {
     if (!map) throw new Error(`message not found: ${localId}`);
     const bot = getOrCreateBot(await getRobotById(map.bot_id));
 
-    return await bot.setMessageReaction(map.chat_id, map.tg_message_id, {reaction:[{emoji, type:'emoji'}]});
+    return await bot.setMessageReaction(map.chat_id, map.tg_message_id, { reaction: [{ emoji, type: 'emoji' }] });
+}
+
+// 工具类：用于控制机器人监听状态
+class BotController {
+    static async startBotListening(bot) {
+        if (!bot._meta.listening) {
+            try {
+                // 添加消息监听处理器（仅在尚未设置时）
+                if (!bot._meta.handlersSetup) {
+                    this.setupMessageHandlers(bot);
+                    bot._meta.handlersSetup = true;
+                }
+
+                await bot.startPolling();
+                bot._meta.listening = true;
+                console.log(`Bot ${bot._meta.id} started listening`);
+            } catch (error) {
+                console.error(`Error starting bot ${bot._meta.id}:`, error);
+                throw error;
+            }
+        }
+    }
+
+    static async stopBotListening(bot) {
+        if (bot._meta.listening) {
+            try {
+                await bot.stopPolling();
+                bot._meta.listening = false;
+                console.log(`Bot ${bot._meta.id} stopped listening`);
+            } catch (error) {
+                console.error(`Error stopping bot ${bot._meta.id}:`, error);
+                throw error;
+            }
+        }
+    }
+
+    static async toggleBotListening(robotId, enabled) {
+        const bot = getOrCreateBot(await getRobotById(robotId));
+        if (bot) {
+            if (enabled) {
+                await this.startBotListening(bot);
+            } else {
+                await this.stopBotListening(bot);
+            }
+        } else {
+            console.log(`Bot ${robotId} not found in cache`);
+        }
+    }
+
+    // 设置消息处理器
+    static setupMessageHandlers(bot) {
+        // 文本消息处理示例
+        bot.on('message', async (msg) => {
+            const chatId = msg.chat.id;
+            const text = msg.text || '';
+
+            console.log(`Received message from ${chatId}: ${text}`);
+
+            // 示例：处理 /start 命令
+            if (text === '/start') {
+                try {
+                    await bot.sendMessage(chatId, '欢迎使用本机器人！请输入 /help 查看帮助信息。');
+                } catch (error) {
+                    console.error('Error sending welcome message:', error);
+                }
+                return;
+            }
+
+            // 示例：处理 /help 命令
+            if (text === '/help') {
+                try {
+                    await bot.sendMessage(chatId, '这是帮助信息：\n- 使用 /start 开始\n- 使用 /help 查看帮助\n- 发送任何其他消息进行测试');
+                } catch (error) {
+                    console.error('Error sending help message:', error);
+                }
+                return;
+            }
+
+            // 默认回复
+            try {
+                await bot.sendMessage(chatId, `您发送了: "${text}"\n这是一条自动回复。`);
+            } catch (error) {
+                console.error('Error sending auto reply:', error);
+            }
+        });
+
+        // 处理回调查询（按钮点击等）
+        bot.on('callback_query', async (callbackQuery) => {
+            const chatId = callbackQuery.message.chat.id;
+            const data = callbackQuery.data;
+
+            console.log(`Callback query from ${chatId}: ${data}`);
+
+            try {
+                // 回答应答
+                await bot.answerCallbackQuery(callbackQuery.id, {
+                    text: `您点击了: ${data}`
+                });
+
+                // 可以根据data值执行不同的操作
+                if (data === 'help') {
+                    await bot.sendMessage(chatId, '这是通过按钮获取的帮助信息');
+                }
+            } catch (error) {
+                console.error('Error handling callback query:', error);
+            }
+        });
+
+        // 处理机器人被添加到群组的情况
+        bot.on('new_chat_members', async (msg) => {
+            const chatId = msg.chat.id;
+            const newMembers = msg.new_chat_members;
+
+            const botInfo = await bot.getMe();
+            const isBotAdded = newMembers.some(member => member.id === botInfo.id);
+
+            if (isBotAdded) {
+                try {
+                    await bot.sendMessage(chatId, '谢谢添加我到群组！请使用 /help 查看我的功能。');
+                } catch (error) {
+                    console.error('Error sending group welcome message:', error);
+                }
+            }
+        });
+
+        // 频道消息处理 - 新增
+        bot.on('channel_post', async (msg) => {
+            const channelId = msg.chat.id;
+            const text = msg.text || '';
+
+            console.log(`Received channel post from ${channelId}: ${text}`);
+
+            // 在这里添加处理频道消息的逻辑
+            // 注意：频道消息不能直接回复，需要使用 sendMesssage 等方法发送到特定聊天
+            try {
+                // 示例：记录频道消息内容
+                console.log(`Channel ${channelId} posted: ${text}`);
+
+            } catch (error) {
+                console.error('Error handling channel post:', error);
+            }
+        });
+    }
+
+    // 示例：发送带有按钮的消息
+    static async sendInteractiveMessage(bot, chatId, text) {
+        try {
+            await bot.sendMessage(chatId, text, {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '帮助', callback_data: 'help' },
+                            { text: '更多信息', callback_data: 'more_info' }
+                        ]
+                    ]
+                }
+            });
+        } catch (error) {
+            console.error('Error sending interactive message:', error);
+        }
+    }
 }
 
 module.exports = {
@@ -172,5 +336,6 @@ module.exports = {
     unpinUsMessage,
     replyToUsMessage,
     sendfile,
-    sendReaction
+    sendReaction,
+    BotController
 };
