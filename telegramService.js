@@ -52,8 +52,12 @@ async function sendMessage(botRecord, chatId, text, options = {}) {
     if (!bot._meta.enabled) throw new Error('bot offline');
 
     if (!bot._meta.limiter.tryRemove()) throw new Error('rate_limited');
+    const sendOptions = {
+        parse_mode: 'MarkdownV2', // or 'Markdown' if you prefer old syntax
+        ...options,
+    };
 
-    return await bot.sendMessage(chatId, text, options);
+    return await bot.sendMessage(chatId, text, sendOptions);
 }
 
 async function sendPhoto(botRecord, chatId, bufferOrUrl, options = {}) {
@@ -61,7 +65,11 @@ async function sendPhoto(botRecord, chatId, bufferOrUrl, options = {}) {
     if (!bot._meta.enabled) throw new Error('bot offline');
     if (!bot._meta.limiter.tryRemove()) throw new Error('rate_limited');
 
-    return await bot.sendPhoto(chatId, bufferOrUrl, options);
+    const sendOptions = {
+        parse_mode: 'MarkdownV2', // or 'Markdown' if you prefer old syntax
+        ...options,
+    };
+    return await bot.sendPhoto(chatId, bufferOrUrl, sendOptions);
 }
 
 async function editMessage(botRecord, chatId, messageId, text, options = {}) {
@@ -69,7 +77,11 @@ async function editMessage(botRecord, chatId, messageId, text, options = {}) {
     if (!bot._meta.enabled) throw new Error('bot offline');
     if (!bot._meta.limiter.tryRemove()) throw new Error('rate_limited');
 
-    return bot.editMessageText(text, Object.assign({ chat_id: chatId, message_id: messageId }, options));
+    const sendOptions = {
+        parse_mode: 'MarkdownV2', // or 'Markdown' if you prefer old syntax
+        ...options,
+    };
+    return bot.editMessageText(text, Object.assign({ chat_id: chatId, message_id: messageId }, sendOptions));
 }
 
 async function deleteMessage(botRecord, chatId, messageId) {
@@ -97,7 +109,12 @@ async function editUsMessage(localId, newText) {
     const map = getMessageMap(localId);
     if (!map) throw new Error(`message not found: ${localId}`);
     const bot = getOrCreateBot(await getRobotById(map.bot_id));
-    return await bot.editMessageText(newText, { chat_id: map.chat_id, message_id: map.tg_message_id });
+
+    const sendOptions = {
+        parse_mode: 'MarkdownV2', // or 'Markdown' if you prefer old syntax
+        ...options,
+    };
+    return await bot.editMessageText(newText, { chat_id: map.chat_id, message_id: map.tg_message_id, ...sendOptions });
 }
 
 async function deleteUsMessage(localId) {
@@ -125,7 +142,12 @@ async function replyToUsMessage(localId, text) {
     const map = getMessageMap(localId);
     if (!map) throw new Error(`message not found: ${localId}`);
     const bot = getOrCreateBot(await getRobotById(map.bot_id));
-    return await bot.sendMessage(map.chat_id, text, { reply_to_message_id: map.tg_message_id });
+
+    const sendOptions = {
+        parse_mode: 'MarkdownV2', // or 'Markdown' if you prefer old syntax
+        ...options,
+    };
+    return await bot.sendMessage(map.chat_id, text, { reply_to_message_id: map.tg_message_id, ...sendOptions });
 }
 
 
@@ -140,5 +162,6 @@ module.exports = {
     deleteUsMessage,
     pinUsMessage,
     unpinUsMessage,
-    replyToUsMessage
+    replyToUsMessage,
+    getRobotById
 };
