@@ -1,5 +1,5 @@
 const { db, popDueItems, removeQueueItem, updateQueueItem, getRobotById, markAsFailed } = require('./db');
-const { sendMessage, sendPhoto, editMessage, deleteMessage, pinMessage, editUsMessage, pinUsMessage, unpinUsMessage, sendfile } = require('./telegramService');
+const { sendMessage, sendPhoto, editMessage, deleteMessage, pinMessage, editUsMessage, pinUsMessage, unpinUsMessage, sendfile, sendReaction } = require('./telegramService');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 
@@ -26,6 +26,7 @@ async function processQueueOnce() {
         const botRecord = db.prepare('SELECT * FROM robots WHERE id=?').get(item.bot_id);
         if (!botRecord) {
             // 没有机器人，丢弃
+            logger.error(`任务[${item.id}] 无法找到机器人，已忽略`);
             removeQueueItem(item.id);
             continue;
         }
@@ -77,6 +78,9 @@ async function processQueueOnce() {
                 await unpinUsMessage(payload.messageId);
             } else if (item.type === 'reply') {
                 sendRes = await sendMessage(botRecord, payload.chatId, payload.text, Object.assign({}, payload.options || {}, { reply_to_message_id: payload.replyTo }));
+            } else if (item.type === 'react') {
+                // 处理表情回应
+                await sendReaction(payload.messageId, payload.emoji);
             }
 
             // 成功则删除队列项
@@ -95,10 +99,12 @@ async function processQueueOnce() {
                 db.prepare('DELETE FROM queue WHERE id=?').run(item.id);
             }
         } catch (err) {
-            // 简单重试策略：增加 attempts，指数回退
+            // 重试策略：增加 attempts，指数回退
             const attempts = (item.attempts || 0) + 1;
             const backoffMs = Math.min(60_000, Math.pow(2, attempts) * 1000);
             const nextTry = Date.now() + backoffMs;
+            
+            // 更新队列项，记录错误信息
             updateQueueItem(item.id, attempts, nextTry, err.message || err.toString());
 
             logger.error(`queued message ${item.id} failed: ${err && err.message}`);

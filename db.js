@@ -55,7 +55,7 @@ module.exports = {
   getRobotById: (id) => db.prepare(`SELECT * FROM robots WHERE id = ?`).get(id),
   updateRobot: (r) => db.prepare(`UPDATE robots SET name=?,token=?,enabled=?,rate_limit=? WHERE id=?`).run(r.name, r.token, r.enabled ? 1 : 0, r.rate_limit || null, r.id),
   deleteRobot: (id) => db.prepare(`DELETE FROM robots WHERE id = ?`).run(id),
-  pushQueue: (item) => db.prepare(`INSERT INTO queue (id,bot_id,type,payload,attempts,next_try_at,created_at) VALUES (?,?,?,?,?,?,?)`).run(item.id, item.bot_id, item.type, item.payload, item.attempts || 0, item.next_try_at || 0, Date.now()),
+  pushQueue: (item) => db.prepare(`INSERT INTO queue (id,bot_id,type,payload,attempts,next_try_at,created_at,max_attempts) VALUES (?,?,?,?,?,?,?,?)`).run(item.id, item.bot_id, item.type, item.payload, item.attempts || 0, item.next_try_at || 0, Date.now(), item.max_attempts),
   popDueItems: (limit) => db.prepare(`SELECT * FROM queue WHERE next_try_at <= ? and status = 'created' ORDER BY created_at LIMIT ?`).all(Date.now(), limit),
   removeQueueItem: (id) => db.prepare(`DELETE FROM queue WHERE id = ?`).run(id),
   updateQueueItem: (id, attempts, next_try_at, last_error) => {

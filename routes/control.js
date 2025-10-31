@@ -16,9 +16,11 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 // multer 配置
 const upload = multer({ dest: uploadDir });
 
-function pushToQueue(botId, type, payload) {
+const max_attempts = process.env.DEFAULT_MAX_ATTEMPTS
+
+function pushToQueue(botId, type, payload, maxAttempts = max_attempts) {
   const id = uuidv4();
-  let data = { id, bot_id: botId, type, payload: JSON.stringify(payload), attempts: 0, next_try_at: 0 }
+  let data = { id, bot_id: botId, type, payload: JSON.stringify(payload), attempts: 0, next_try_at: 0, max_attempts: maxAttempts }
   db.pushQueue(data);
   logger.info(`queued message ${JSON.stringify(data)}`);
   return id;
@@ -52,7 +54,7 @@ router.post('/pin', (req, res) => {
   res.json({ queued: true, id });
 });
 
-// 置顶
+// 取消置顶
 router.post('/unpin', (req, res) => {
   const id = pushToQueue(req.body.botId, 'unpin', req.body);
   res.json({ queued: true, id });
@@ -64,6 +66,21 @@ router.post('/reply', (req, res) => {
   res.json({ queued: true, id });
 });
 
+/**
+ * 表情回应
+ * Reaction emoji. Currently, it can be one of "❤", "👍", "👎", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢", 
+ * "🎉", "🤩", "🤮", "💩", "🙏", "👌", "🕊", "🤡", "🥱", "🥴", "😍", "🐳", "❤‍🔥", "🌚", "🌭", "💯", "🤣", "⚡", "🍌",
+ * "🏆", "💔", "🤨", "😐", "🍓", "🍾", "💋", "🖕", "😈", "😴", "😭", "🤓", "👻", "👨‍💻", "👀",
+ * "🎃", "🙈", "😇", "😨", "🤝", "✍", "🤗", "🫡", "🎅", "🎄", "☃", "💅", "🤪", "🗿", "🆒", "💘", "🙉", 
+ * "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂", "🤷", "🤷‍♀", "😡"
+ */
+router.post('/react', (req, res) => {
+  // body: { messageId, emoji }
+  const body = req.body;
+  if (!body.messageId || !body.emoji) return res.status(400).json({ error: 'missing localId/emoji' });
+  const id = pushToQueue(req.body.botId, 'react', body); // botId 会在处理时从 message_map 中获取
+  res.json({ queued: true, id });
+});
 
 // POST /api/control/sendFile
 router.post('/sendfile', upload.single('file'), async (req, res) => {

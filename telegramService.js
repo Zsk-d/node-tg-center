@@ -147,7 +147,7 @@ async function replyToUsMessage(localId, text) {
         parse_mode: 'MarkdownV2', // or 'Markdown' if you prefer old syntax
         ...options,
     };
-    return await bots.sendMessage(map.chat_id, text, { reply_to_message_id: map.tg_message_id, ...sendOptions });
+    return await bot.sendMessage(map.chat_id, text, { reply_to_message_id: map.tg_message_id, ...sendOptions });
 }
 
 async function sendfile(botRecord, chatid, filePath, msgOption, sendOption) {
@@ -155,6 +155,14 @@ async function sendfile(botRecord, chatid, filePath, msgOption, sendOption) {
     return await bot.sendDocument(chatid, filePath, msgOption, sendOption);
 }
 
+// 添加表情回应功能
+async function sendReaction(localId, emoji) {
+    const map = getMessageMap(localId);
+    if (!map) throw new Error(`message not found: ${localId}`);
+    const bot = getOrCreateBot(await getRobotById(map.bot_id));
+
+    return await bot.setMessageReaction(map.chat_id, map.tg_message_id, {reaction:[{emoji, type:'emoji'}]});
+}
 
 module.exports = {
     getOrCreateBot,
@@ -169,4 +177,5 @@ module.exports = {
     unpinUsMessage,
     replyToUsMessage,
     sendfile,
+    sendReaction
 };

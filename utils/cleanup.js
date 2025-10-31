@@ -9,7 +9,7 @@ const CLEAR_MSG_MAP_INTERVAL = process.env.CLEAR_MSG_MAP_INTERVAL || 3600;
 async function cleanupOldMessageMaps() {
     logger.info('开始清理消息发送记录');
 
-    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).getTime();
 
     const sql = `DELETE FROM message_map WHERE created_at < ?`;
     const result = db.prepare(sql).run(twelveHoursAgo);
