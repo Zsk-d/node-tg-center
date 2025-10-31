@@ -2,63 +2,288 @@
 <html>
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Telegram Bot Controller - Admin</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <style>
-    body{font-family: Arial; padding:20px}
-    input, button, select, textarea{margin:6px 0; display:block}
-    .robot{border:1px solid #ddd;padding:8px;margin:8px 0}
-  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="./main.css">
 </head>
 <body>
-  <div id="root"></div>
+  <div class="container">
+    <header>
+      <h1><i class="fas fa-robot"></i> Telegram Bot 控制中心</h1>
+      <p class="subtitle">集中管理和控制您的 Telegram 机器人</p>
+    </header>
+    
+    <div id="root"></div>
+  </div>
+
   <script>
     const e = React.createElement;
-    function App(){
+    
+    function Notification({ message, type, show }) {
+      return e('div', {
+        className: `notification ${type} ${show ? 'show' : ''}`
+      }, message);
+    }
+    
+    function TestForm({ bot, onClose, onSend, notification }) {
+      const [chatId, setChatId] = React.useState('');
+      const [text, setText] = React.useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!chatId.trim() || !text.trim()) {
+          notification('请填写聊天ID和消息内容', 'error');
+          return;
+        }
+        onSend(bot, chatId, text);
+      };
+
+      return e('div', { className: 'test-form' },
+        e('div', { className: 'test-form-header' },
+          e('div', { className: 'test-form-title' }, 
+            e('i', { className: 'fas fa-paper-plane' }), ' 发送测试消息'
+          ),
+          e('button', { className: 'close-btn', onClick: onClose },
+            e('i', { className: 'fas fa-times' })
+          )
+        ),
+        e('form', { onSubmit: handleSubmit },
+          e('div', { className: 'form-row' },
+            e('div', { className: 'form-col' },
+              e('div', { className: 'form-group' },
+                e('label', { htmlFor: `chatId-${bot.id}` }, '聊天ID或频道用户名'),
+                e('input', {
+                  id: `chatId-${bot.id}`,
+                  placeholder: '@channelusername 或聊天ID',
+                  value: chatId,
+                  onChange: (e) => setChatId(e.target.value)
+                })
+              )
+            )
+          ),
+          e('div', { className: 'form-row' },
+            e('div', { className: 'form-col' },
+              e('div', { className: 'form-group' },
+                e('label', { htmlFor: `text-${bot.id}` }, '消息内容'),
+                e('textarea', {
+                  id: `text-${bot.id}`,
+                  placeholder: '输入要发送的消息内容...',
+                  rows: 3,
+                  value: text,
+                  onChange: (e) => setText(e.target.value)
+                })
+              )
+            )
+          ),
+          e('button', { className: 'send-btn', type: 'submit' },
+            e('i', { className: 'fas fa-paper-plane' }), ' 发送消息'
+          )
+        )
+      );
+    }
+    
+    function App() {
       const [robots, setRobots] = React.useState([]);
       const [form, setForm] = React.useState({name:'', token:'', rate_limit:1});
+      const [notification, setNotification] = React.useState({ show: false, message: '', type: 'success' });
+      const [testForms, setTestForms] = React.useState({}); // Track which bots have open test forms
+
+      function showNotification(message, type = 'success') {
+        setNotification({ show: true, message, type });
+        setTimeout(() => {
+          setNotification(prev => ({ ...prev, show: false }));
+        }, 3000);
+      }
 
       function load(){
-        fetch('/api/robots').then(r=>r.json()).then(setRobots);
+        fetch('/api/robots')
+          .then(r => r.json())
+          .then(setRobots)
+          .catch(err => {
+            console.error('Failed to load robots:', err);
+            showNotification('加载机器人列表失败', 'error');
+          });
       }
+      
       React.useEffect(()=>{load()},[]);
 
       async function create(){
-        await fetch('/api/robots', {method:'POST',headers:{'content-type':'application/json'}, body: JSON.stringify(form)});
-        setForm({name:'', token:'', rate_limit:1});
-        load();
+        if (!form.name || !form.token) {
+          showNotification('请填写机器人名称和Token', 'error');
+          return;
+        }
+        
+        try {
+          await fetch('/api/robots', {
+            method:'POST',
+            headers:{'content-type':'application/json'}, 
+            body: JSON.stringify(form)
+          });
+          
+          setForm({name:'', token:'', rate_limit:1});
+          load();
+          showNotification('机器人创建成功');
+        } catch (err) {
+          console.error('Failed to create robot:', err);
+          showNotification('创建机器人失败', 'error');
+        }
       }
 
       async function toggle(id, enabled){
-        await fetch(`/api/robots/${id}/toggle`, {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({enabled})});
-        load();
+        try {
+          await fetch(`/api/robots/${id}/toggle`, {
+            method:'POST', 
+            headers:{'content-type':'application/json'}, 
+            body: JSON.stringify({enabled})
+          });
+          
+          load();
+          showNotification(enabled ? '机器人已上线' : '机器人已下线');
+        } catch (err) {
+          console.error('Failed to toggle robot:', err);
+          showNotification('切换机器人状态失败', 'error');
+        }
       }
 
-      async function testSend(bot){
-        const chatId = prompt('chat id or channel (e.g. @channelusername)');
-        if(!chatId) return;
-        const text = prompt('message text');
-        await fetch('/api/control/send', {method:'POST',headers:{'content-type':'application/json'}, body: JSON.stringify({botId: bot.id, chatId, text})});
-        alert('queued');
+      async function testSend(bot, chatId, text){
+        try {
+          await fetch('/api/control/send', {
+            method:'POST',
+            headers:{
+              'content-type':'application/json',
+              'Authorization': '1122'
+            }, 
+            body: JSON.stringify({botId: bot.id, chatId, text})
+          });
+          
+          // Close the test form after successful send
+          setTestForms(prev => {
+            const newForms = { ...prev };
+            delete newForms[bot.id];
+            return newForms;
+          });
+          
+          showNotification('消息已加入队列');
+        } catch (err) {
+          console.error('Failed to send message:', err);
+          showNotification('发送消息失败', 'error');
+        }
+      }
+      
+      function deleteRobot(id) {
+        if (!confirm('确定要删除这个机器人吗？此操作不可恢复。')) return;
+        
+        fetch(`/api/robots/${id}`, { method: 'DELETE' })
+          .then(() => {
+            load();
+            showNotification('机器人删除成功');
+          })
+          .catch(err => {
+            console.error('Failed to delete robot:', err);
+            showNotification('删除机器人失败', 'error');
+          });
+      }
+
+      // Toggle test form visibility
+      function toggleTestForm(botId) {
+        setTestForms(prev => ({
+          ...prev,
+          [botId]: !prev[botId]
+        }));
       }
 
       return e('div', null,
-        e('h1', null, 'Bot 管理'),
-        e('div', null,
-          e('input', {placeholder:'name', value: form.name, onChange: (e)=>setForm({...form, name: e.target.value})}),
-          e('input', {placeholder:'token', value: form.token, onChange: (e)=>setForm({...form, token: e.target.value})}),
-          e('input', {placeholder:'rate_limit (msg/sec)', value: form.rate_limit, type:'number', onChange: (e)=>setForm({...form, rate_limit: parseFloat(e.target.value)})}),
-          e('button', {onClick: create}, '新增机器人')
+        e(Notification, { 
+          message: notification.message, 
+          type: notification.type, 
+          show: notification.show 
+        }),
+        e('div', { className: 'card' },
+          e('h2', null, e('i', { className: 'fas fa-plus-circle' }), ' 添加新机器人'),
+          e('div', { className: 'form-group' },
+            e('label', { htmlFor: 'name' }, '机器人名称'),
+            e('input', { 
+              id: 'name',
+              placeholder:'输入机器人名称', 
+              value: form.name, 
+              onChange: (e)=>setForm({...form, name: e.target.value}) 
+            })
+          ),
+          e('div', { className: 'form-group' },
+            e('label', { htmlFor: 'token' }, '机器人 Token'),
+            e('input', { 
+              id: 'token',
+              placeholder:'输入机器人 Token', 
+              value: form.token, 
+              onChange: (e)=>setForm({...form, token: e.target.value}) 
+            })
+          ),
+          e('div', { className: 'form-group' },
+            e('label', { htmlFor: 'rate_limit' }, '速率限制 (消息/秒)'),
+            e('input', { 
+              id: 'rate_limit',
+              placeholder:'默认为 1', 
+              value: form.rate_limit, 
+              type:'number', 
+              step: '0.1',
+              min: '0.1',
+              onChange: (e)=>setForm({...form, rate_limit: parseFloat(e.target.value) || 1}) 
+            })
+          ),
+          e('button', { className: 'btn btn-block', onClick: create }, 
+            e('i', { className: 'fas fa-plus' }), ' 新增机器人')
         ),
-        e('h2', null, '已配置机器人'),
-        robots.map(r => e('div', {key: r.id, className:'robot'},
-          e('div', null, e('strong', null, r.name), ' (', r.id, ')'),
-          e('div', null, 'enabled: ', r.enabled ? 'yes' : 'no'),
-          e('div', null, 'rate_limit: ', r.rate_limit),
-          e('button', {onClick: ()=>toggle(r.id, !r.enabled)}, r.enabled ? '下线' : '上线'),
-          e('button', {onClick: ()=>testSend(r)}, '测试发送')
-        ))
+        e('div', { className: 'card' },
+          e('h2', null, e('i', { className: 'fas fa-th-list' }), ' 已配置机器人'),
+          e('div', { className: 'robots-grid' },
+            robots.length === 0 ? 
+              e('p', { style: { gridColumn: '1 / -1', textAlign: 'center', padding: '20px' } }, '暂无机器人，请添加一个新的机器人') :
+              robots.map(r => e('div', { key: r.id, className: 'robot-card' },
+                e('div', { className: 'robot-header' },
+                  e('div', null,
+                    e('div', { className: 'robot-name' }, r.name),
+                    e('div', { className: 'robot-id' }, r.id)
+                  ),
+                  e('span', { 
+                    className: `robot-status ${r.enabled ? 'status-active' : 'status-inactive'}` 
+                  }, r.enabled ? '在线' : '离线')
+                ),
+                e('div', { className: 'robot-details' },
+                  e('div', { className: 'detail-item' },
+                    e('span', { className: 'detail-label' }, '速率限制:'),
+                    e('span', { className: 'detail-value' }, `${r.rate_limit || 1} 消息/秒`)
+                  ),
+                  e('div', { className: 'detail-item' },
+                    e('span', { className: 'detail-label' }, '创建时间:'),
+                    e('span', { className: 'detail-value' }, new Date(r.created_at).toLocaleString())
+                  )
+                ),
+                e('div', { className: 'robot-actions' },
+                  e('button', { 
+                    className: `action-btn btn ${r.enabled ? 'btn-warning' : 'btn-success'}`,
+                    onClick: ()=>toggle(r.id, !r.enabled)
+                  }, r.enabled ? e('i', { className: 'fas fa-power-off' }, ' 下线') : e('i', { className: 'fas fa-plug' }, ' 上线')),
+                  e('button', { 
+                    className: 'action-btn btn btn-outline',
+                    onClick: ()=>toggleTestForm(r.id)
+                  }, e('i', { className: 'fas fa-paper-plane' }, ' 测试')),
+                  e('button', { 
+                    className: 'action-btn btn btn-danger',
+                    onClick: ()=>deleteRobot(r.id)
+                  }, e('i', { className: 'fas fa-trash' }, ' 删除'))
+                ),
+                testForms[r.id] && e(TestForm, {
+                  bot: r,
+                  onClose: () => toggleTestForm(r.id),
+                  onSend: testSend,
+                  notification: showNotification
+                })
+              ))
+          )
+        )
       );
     }
 
