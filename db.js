@@ -73,5 +73,8 @@ module.exports = {
   markAsFailed: (id, last_error) => {
     const stmt = db.prepare(`UPDATE queue SET last_error=?, status='failed' WHERE id=?`);
     stmt.run(last_error, id);
+  },
+  getMessageMap(id){
+    return db.prepare(`SELECT * FROM message_map WHERE id = ?`).get(id);
   }
 };

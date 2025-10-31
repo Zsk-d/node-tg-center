@@ -105,4 +105,15 @@ router.post('/sendfile', upload.single('file'), async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+/**
+ * 通过本地消息id获取tg消息发送数据
+ */
+router.get('/msg', (req, res) => {
+  let messageId = req.query.messageId
+  const msg = db.getMessageMap(messageId)
+  msg.res = JSON.parse(msg.res)
+  res.json({ ok: true, data: msg });
+});
+
 module.exports = router;

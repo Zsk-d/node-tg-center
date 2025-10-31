@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { HttpsProxyAgent } = require('https-proxy-agent');
-const { getRobotById, db } = require('./db');
+const { getRobotById, db, getMessageMap } = require('./db');
 
 // 新增：代理地址
 const PROXY_URL = process.env.PROXY_URL || 'http://127.0.0.1:10809';
@@ -98,11 +98,6 @@ async function pinMessage(botRecord, chatId, messageId, options = {}) {
     if (!bot._meta.limiter.tryRemove()) throw new Error('rate_limited');
 
     return bot.pinChatMessage(chatId, messageId, options);
-}
-
-// 根据本地消息ID获取映射
-function getMessageMap(localId) {
-    return db.prepare('SELECT * FROM message_map WHERE id=?').get(localId);
 }
 
 async function editUsMessage(localId, newText) {
