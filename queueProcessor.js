@@ -1,4 +1,4 @@
-const { db, popDueItems, removeQueueItem, updateQueueItem, getRobotById, markAsFailed } = require('./db');
+const { db, popDueItems, removeQueueItem, updateQueueItem, getRobotById, markAsFailed, saveSendResMap } = require('./db');
 const { sendMessage, sendPhoto, editMessage, deleteMessage, pinMessage, editUsMessage, pinUsMessage, unpinUsMessage, sendfile, sendReaction } = require('./telegramService');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
@@ -89,21 +89,14 @@ async function processQueueOnce() {
             logger.info(`queued message ${item.id} handled`);
             // 保存map
             if (sendRes) {
-                db.prepare(`
-                        INSERT OR REPLACE INTO message_map (id, bot_id, chat_id, tg_message_id, type, status, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    `).run(
-                    item.id, item.bot_id, payload.chatId, sendRes.message_id, 'text', 'sent', Date.now()
-                );
-
-                db.prepare('DELETE FROM queue WHERE id=?').run(item.id);
+                saveSendResMap(item, payload, sendRes)
             }
         } catch (err) {
             // 重试策略：增加 attempts，指数回退
             const attempts = (item.attempts || 0) + 1;
             const backoffMs = Math.min(60_000, Math.pow(2, attempts) * 1000);
             const nextTry = Date.now() + backoffMs;
-            
+
             // 更新队列项，记录错误信息
             updateQueueItem(item.id, attempts, nextTry, err.message || err.toString());
 

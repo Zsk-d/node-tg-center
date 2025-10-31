@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS message_map (
   chat_id TEXT NOT NULL,
   tg_message_id INTEGER,
   type TEXT,
+  res TEXT,
   status TEXT DEFAULT 'sent',
   created_at INTEGER
 );
@@ -61,6 +62,12 @@ module.exports = {
   updateQueueItem: (id, attempts, next_try_at, last_error) => {
     const stmt = db.prepare(`UPDATE queue SET attempts=?, next_try_at=?, last_error=? WHERE id=?`);
     stmt.run(attempts, next_try_at, last_error, id);
+  },
+  saveSendResMap: (item, payload, sendRes) => {
+    db.prepare(`INSERT OR REPLACE INTO message_map (id, bot_id, chat_id, tg_message_id, type, res, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(item.id, item.bot_id, payload.chatId, sendRes.message_id, 'text', JSON.stringify(sendRes), 'sent', Date.now());
+
+    db.prepare('DELETE FROM queue WHERE id=?').run(item.id);
   },
   // 新增方法：标记任务为失败（达到最大重试次数）
   markAsFailed: (id, last_error) => {
