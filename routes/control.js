@@ -2,6 +2,17 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const { getOrCreateBot } = require('../telegramService');
+
+// 上传临时存储目录
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+
+// multer 配置
+const upload = multer({ dest: uploadDir });
 
 function pushToQueue(botId, type, payload) {
   const id = uuidv4();
@@ -49,4 +60,28 @@ router.post('/reply', (req, res) => {
   res.json({ queued: true, id });
 });
 
+
+// POST /api/control/sendFile
+router.post('/sendfile', upload.single('file'), async (req, res) => {
+  try {
+    const { botId, chatId, caption = '', format = 'md' } = req.body;
+    if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
+
+    const payload = {
+      filePath: req.file.path,
+      originalName: req.file.originalname,
+      caption,
+      format,
+      chatId
+    };
+
+    // 加入消息队列
+    const queueId = await pushToQueue(botId, 'file', payload);
+
+    res.json({ ok: true, queueId });
+  } catch (err) {
+    console.error('sendFile queue error', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 module.exports = router;

@@ -6,7 +6,6 @@ const path = require('path');
 const robotsRouter = require('./routes/robots');
 const controlRouter = require('./routes/control');
 const systemRouter = require('./routes/system');
-const sendFileRouter = require('./routes/sendFile');
 
 const authMiddleware = require('./middleware/auth');
 
@@ -25,7 +24,6 @@ app.use('/api/control', authMiddleware(API_TOKEN));
 app.use('/api/robots', robotsRouter);
 app.use('/api/control', controlRouter);
 app.use('/api/system', systemRouter);
-app.use('/api/sendFile', sendFileRouter);
 
 // admin static page
 app.use('/', express.static(path.join(__dirname, 'public')));

@@ -147,7 +147,12 @@ async function replyToUsMessage(localId, text) {
         parse_mode: 'MarkdownV2', // or 'Markdown' if you prefer old syntax
         ...options,
     };
-    return await bot.sendMessage(map.chat_id, text, { reply_to_message_id: map.tg_message_id, ...sendOptions });
+    return await bots.sendMessage(map.chat_id, text, { reply_to_message_id: map.tg_message_id, ...sendOptions });
+}
+
+async function sendfile(botRecord, chatid, filePath, msgOption, sendOption) {
+    const bot = getOrCreateBot(botRecord, parseFloat(process.env.DEFAULT_RATE_LIMIT || 1));
+    return await bot.sendDocument(chatid, filePath, msgOption, sendOption);
 }
 
 
@@ -163,5 +168,5 @@ module.exports = {
     pinUsMessage,
     unpinUsMessage,
     replyToUsMessage,
-    getRobotById
+    sendfile,
 };

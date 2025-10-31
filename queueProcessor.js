@@ -1,6 +1,7 @@
 const { db, popDueItems, removeQueueItem, updateQueueItem, getRobotById } = require('./db');
-const { sendMessage, sendPhoto, editMessage, deleteMessage, pinMessage, editUsMessage, pinUsMessage, unpinUsMessage } = require('./telegramService');
+const { sendMessage, sendPhoto, editMessage, deleteMessage, pinMessage, editUsMessage, pinUsMessage, unpinUsMessage, sendfile } = require('./telegramService');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
 
 const MAX_BATCH = 10; // 每次拉取的任务数
 
@@ -31,6 +32,23 @@ async function processQueueOnce() {
                 } else {
                     sendRes = await sendMessage(botRecord, payload.chatId, payload.text, payload.options || {});
                 }
+            } if (item.type === 'file') {
+                // if (payload.base64_photo) {
+                //     const buf = Buffer.from(payload.base64_photo, 'base64');
+                //     sendRes = await sendPhoto(botRecord, payload.chatId, buf, { caption: payload.text });
+                // } else {
+                //     sendRes = await sendMessage(botRecord, payload.chatId, payload.text, payload.options || {});
+                // }
+                const { filePath, originalName, caption, format } = JSON.parse(item.payload);
+                sendRes = await sendfile(botRecord,
+                    payload.chatId,
+                    filePath,
+                    { caption, parse_mode: format === 'html' ? 'HTML' : 'MarkdownV2' },
+                    { filename: originalName }
+                );
+
+                // 发送完成后删除临时文件
+                fs.unlink(filePath, () => { });
             } else if (item.type === 'edit') {
                 // await editMessage(botRecord, payload.chatId, payload.messageId, payload.text, payload.options || {});
                 await editUsMessage(payload.messageId, payload.text);
