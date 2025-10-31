@@ -31,7 +31,7 @@ async function processQueueOnce() {
         const maxAttempts = item.max_attempts || DEFAULT_MAX_ATTEMPTS;
         if (item.attempts >= maxAttempts) {
             markAsFailed(item.id, item.last_error || '达到最大重试次数');
-            console.error('任务已达到最大重试次数，已标记为失败:', item.id);
+            logger.error(`任务[${item.id}]已达到最大重试次数，已标记为失败`);
             continue;
         }
 
@@ -95,8 +95,8 @@ async function processQueueOnce() {
             const backoffMs = Math.min(60_000, Math.pow(2, attempts) * 1000);
             const nextTry = Date.now() + backoffMs;
             updateQueueItem(item.id, attempts, nextTry, err.message || err.toString());
-            // log（实际项目中可替换为更完善的 logger）
-            console.error('queue item failed:', item.id, err && err.message);
+
+            logger.error(`queued message ${item.id} failed: ${err && err.message}`);
         }
     }
 }

@@ -84,7 +84,7 @@ router.post('/sendfile', upload.single('file'), async (req, res) => {
 
     res.json({ ok: true, queueId });
   } catch (err) {
-    console.error('sendFile queue error', err);
+    logger.error('sendFile queue error' + err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
