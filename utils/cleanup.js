@@ -15,8 +15,9 @@ async function cleanupOldMessageMaps() {
 
     const sql = `DELETE FROM message_map WHERE created_at < ?`;
     const result = db.prepare(sql).run(twelveHoursAgo);
-
-    logger.info(`[Cleanup] Deleted ${result.changes} old message_map records`);
+    if (result.changes > 0) {
+        logger.info(`[Cleanup] Deleted ${result.changes} old message_map records`);
+    }
 }
 
 /**
@@ -30,7 +31,7 @@ function startCleanupScheduler() {
         });
     }, CLEAR_MSG_MAP_INTERVAL * 1000);
 
-    logger.info('[Cleanup] Scheduler started (runs every 1h)');
+    logger.info('[Cleanup] Scheduler started');
 }
 
 module.exports = {
