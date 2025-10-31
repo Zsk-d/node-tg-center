@@ -32,38 +32,38 @@ router.post('/send', (req, res) => {
   const body = req.body;
   if (!body.botId || !body.chatId) return res.status(400).send('missing botId/chatId');
   const id = pushToQueue(body.botId, 'send', body);
-  res.json({ queued: true, id });
+  res.json({ ok: true, data: id });
 });
 
 // 编辑
 router.post('/edit', (req, res) => {
   // body: { botId, chatId, messageId, text }
   const id = pushToQueue(req.body.botId, 'edit', req.body);
-  res.json({ queued: true, id });
+  res.json({ ok: true, data: id });
 });
 
 // 删除
 router.post('/delete', (req, res) => {
   const id = pushToQueue(req.body.botId, 'delete', req.body);
-  res.json({ queued: true, id });
+  res.json({ ok: true, data: id });
 });
 
 // 置顶
 router.post('/pin', (req, res) => {
   const id = pushToQueue(req.body.botId, 'pin', req.body);
-  res.json({ queued: true, id });
+  res.json({ ok: true, data: id });
 });
 
 // 取消置顶
 router.post('/unpin', (req, res) => {
   const id = pushToQueue(req.body.botId, 'unpin', req.body);
-  res.json({ queued: true, id });
+  res.json({ ok: true, data: id });
 });
 
 // 回复
 router.post('/reply', (req, res) => {
   const id = pushToQueue(req.body.botId, 'reply', req.body);
-  res.json({ queued: true, id });
+  res.json({ ok: true, data: id });
 });
 
 /**
@@ -79,7 +79,7 @@ router.post('/react', (req, res) => {
   const body = req.body;
   if (!body.messageId || !body.emoji) return res.status(400).json({ error: 'missing localId/emoji' });
   const id = pushToQueue(req.body.botId, 'react', body); // botId 会在处理时从 message_map 中获取
-  res.json({ queued: true, id });
+  res.json({ ok: true, data: id });
 });
 
 // POST /api/control/sendFile
@@ -99,7 +99,7 @@ router.post('/sendfile', upload.single('file'), async (req, res) => {
     // 加入消息队列
     const queueId = await pushToQueue(botId, 'file', payload);
 
-    res.json({ ok: true, queueId });
+    res.json({ ok: true, data: queueId });
   } catch (err) {
     logger.error('sendFile queue error' + err);
     res.status(500).json({ ok: false, error: err.message });
