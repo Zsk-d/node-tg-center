@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS queue (
   payload TEXT,
   attempts INTEGER DEFAULT 0,
   next_try_at INTEGER DEFAULT 0,
+  last_error TEXT,
+  status TEXT DEFAULT 'created',
+  max_attempts INTEGER DEFAULT 5,
   created_at INTEGER
 );
 
@@ -50,10 +53,18 @@ module.exports = {
   },
   getRobots: () => db.prepare(`SELECT * FROM robots`).all(),
   getRobotById: (id) => db.prepare(`SELECT * FROM robots WHERE id = ?`).get(id),
-  updateRobot: (r) => db.prepare(`UPDATE robots SET name=?,token=?,enabled=?,rate_limit=? WHERE id=?`).run(r.name, r.token, r.enabled?1:0, r.rate_limit||null, r.id),
+  updateRobot: (r) => db.prepare(`UPDATE robots SET name=?,token=?,enabled=?,rate_limit=? WHERE id=?`).run(r.name, r.token, r.enabled ? 1 : 0, r.rate_limit || null, r.id),
   deleteRobot: (id) => db.prepare(`DELETE FROM robots WHERE id = ?`).run(id),
-  pushQueue: (item) => db.prepare(`INSERT INTO queue (id,bot_id,type,payload,attempts,next_try_at,created_at) VALUES (?,?,?,?,?,?,?)`).run(item.id, item.bot_id, item.type, item.payload, item.attempts||0, item.next_try_at||0, Date.now()),
-  popDueItems: (limit) => db.prepare(`SELECT * FROM queue WHERE next_try_at <= ? ORDER BY created_at LIMIT ?`).all(Date.now(), limit),
+  pushQueue: (item) => db.prepare(`INSERT INTO queue (id,bot_id,type,payload,attempts,next_try_at,created_at) VALUES (?,?,?,?,?,?,?)`).run(item.id, item.bot_id, item.type, item.payload, item.attempts || 0, item.next_try_at || 0, Date.now()),
+  popDueItems: (limit) => db.prepare(`SELECT * FROM queue WHERE next_try_at <= ? and status = 'created' ORDER BY created_at LIMIT ?`).all(Date.now(), limit),
   removeQueueItem: (id) => db.prepare(`DELETE FROM queue WHERE id = ?`).run(id),
-  updateQueueItem: (id, attempts, next_try_at) => db.prepare(`UPDATE queue SET attempts=?, next_try_at=? WHERE id=?`).run(attempts, next_try_at, id)
+  updateQueueItem: (id, attempts, next_try_at, last_error) => {
+    const stmt = db.prepare(`UPDATE queue SET attempts=?, next_try_at=?, last_error=? WHERE id=?`);
+    stmt.run(attempts, next_try_at, last_error, id);
+  },
+  // 新增方法：标记任务为失败（达到最大重试次数）
+  markAsFailed: (id, last_error) => {
+    const stmt = db.prepare(`UPDATE queue SET last_error=?, status='failed' WHERE id=?`);
+    stmt.run(last_error, id);
+  }
 };

@@ -5,7 +5,9 @@ const db = require('../db');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const { getOrCreateBot } = require('../telegramService');
+
+const { getLogger } = require('../utils/logger');
+const logger = getLogger(__filename);
 
 // 上传临时存储目录
 const uploadDir = path.join(__dirname, '../uploads');
@@ -16,7 +18,9 @@ const upload = multer({ dest: uploadDir });
 
 function pushToQueue(botId, type, payload) {
   const id = uuidv4();
-  db.pushQueue({ id, bot_id: botId, type, payload: JSON.stringify(payload), attempts: 0, next_try_at: 0 });
+  let data = { id, bot_id: botId, type, payload: JSON.stringify(payload), attempts: 0, next_try_at: 0 }
+  db.pushQueue(data);
+  logger.info(`queued message ${JSON.stringify(data)}`);
   return id;
 }
 

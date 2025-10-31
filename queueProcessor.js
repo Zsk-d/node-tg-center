@@ -1,11 +1,15 @@
-const { db, popDueItems, removeQueueItem, updateQueueItem, getRobotById } = require('./db');
+const { db, popDueItems, removeQueueItem, updateQueueItem, getRobotById, markAsFailed } = require('./db');
 const { sendMessage, sendPhoto, editMessage, deleteMessage, pinMessage, editUsMessage, pinUsMessage, unpinUsMessage, sendfile } = require('./telegramService');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 
 const MAX_BATCH = 10; // 每次拉取的任务数
+const DEFAULT_MAX_ATTEMPTS = process.env.DEFAULT_MAX_ATTEMPTS || 5; // 默认最大重试次数
 
 let processing = false;
+
+const { getLogger } = require('./utils/logger');
+const logger = getLogger(__filename);
 
 async function processQueueOnce() {
     const items = popDueItems(MAX_BATCH);
@@ -20,6 +24,14 @@ async function processQueueOnce() {
         // 检查是否启用
         if (!botRecord.enabled) {
             // removeQueueItem(item.id);
+            continue;
+        }
+
+        // 检查是否达到最大重试次数
+        const maxAttempts = item.max_attempts || DEFAULT_MAX_ATTEMPTS;
+        if (item.attempts >= maxAttempts) {
+            markAsFailed(item.id, item.last_error || '达到最大重试次数');
+            console.error('任务已达到最大重试次数，已标记为失败:', item.id);
             continue;
         }
 
@@ -64,6 +76,8 @@ async function processQueueOnce() {
 
             // 成功则删除队列项
             removeQueueItem(item.id);
+            // 日志: 已处理消息
+            logger.info(`queued message ${item.id} handled`);
             // 保存map
             if (sendRes) {
                 db.prepare(`
@@ -80,7 +94,7 @@ async function processQueueOnce() {
             const attempts = (item.attempts || 0) + 1;
             const backoffMs = Math.min(60_000, Math.pow(2, attempts) * 1000);
             const nextTry = Date.now() + backoffMs;
-            updateQueueItem(item.id, attempts, nextTry);
+            updateQueueItem(item.id, attempts, nextTry, err.message || err.toString());
             // log（实际项目中可替换为更完善的 logger）
             console.error('queue item failed:', item.id, err && err.message);
         }
