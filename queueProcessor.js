@@ -11,6 +11,14 @@ let processing = false;
 const { getLogger } = require('./utils/logger');
 const logger = getLogger(__filename);
 
+/**
+ * 转义消息文字
+ * @param {*} payload 
+ */
+function parseText(text) {
+    return text.replace(/([_*\[\]()~>#+\-=|{}.!\\])/g, '\\$1');
+}
+
 async function processQueueOnce() {
     const items = popDueItems(MAX_BATCH);
     for (const item of items) {
@@ -34,6 +42,9 @@ async function processQueueOnce() {
             logger.error(`任务[${item.id}]已达到最大重试次数，已标记为失败`);
             continue;
         }
+        if (payload.text) {
+            payload.text = parseText(payload.text)
+        }
 
         try {
             let sendRes = null
@@ -45,17 +56,11 @@ async function processQueueOnce() {
                     sendRes = await sendMessage(botRecord, payload.chatId, payload.text, payload.options || {});
                 }
             } if (item.type === 'file') {
-                // if (payload.base64_photo) {
-                //     const buf = Buffer.from(payload.base64_photo, 'base64');
-                //     sendRes = await sendPhoto(botRecord, payload.chatId, buf, { caption: payload.text });
-                // } else {
-                //     sendRes = await sendMessage(botRecord, payload.chatId, payload.text, payload.options || {});
-                // }
-                const { filePath, originalName, caption, format } = JSON.parse(item.payload);
+                const { filePath, originalName, text, format } = JSON.parse(item.payload);
                 sendRes = await sendfile(botRecord,
                     payload.chatId,
                     filePath,
-                    { caption, parse_mode: format === 'html' ? 'HTML' : 'MarkdownV2' },
+                    { caption: text, parse_mode: format === 'html' ? 'HTML' : 'MarkdownV2' },
                     { filename: originalName }
                 );
 

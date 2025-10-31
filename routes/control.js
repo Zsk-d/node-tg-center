@@ -68,13 +68,13 @@ router.post('/reply', (req, res) => {
 // POST /api/control/sendFile
 router.post('/sendfile', upload.single('file'), async (req, res) => {
   try {
-    const { botId, chatId, caption = '', format = 'md' } = req.body;
+    const { botId, chatId, text = '', format = 'md' } = req.body;
     if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
 
     const payload = {
       filePath: req.file.path,
       originalName: req.file.originalname,
-      caption,
+      text,
       format,
       chatId
     };
