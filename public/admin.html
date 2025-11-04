@@ -1,5 +1,6 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +10,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./main.css">
 </head>
+
 <body>
   <div class="container">
     <header>
@@ -20,19 +22,19 @@
         </a>
       </div>
     </header>
-    
+
     <div id="root"></div>
   </div>
 
   <script>
     const e = React.createElement;
-    
+
     function Notification({ message, type, show }) {
       return e('div', {
         className: `notification ${type} ${show ? 'show' : ''}`
       }, message);
     }
-    
+
     function TestForm({ bot, onClose, onSend, notification }) {
       const [chatId, setChatId] = React.useState('');
       const [text, setText] = React.useState('');
@@ -48,7 +50,7 @@
 
       return e('div', { className: 'test-form' },
         e('div', { className: 'test-form-header' },
-          e('div', { className: 'test-form-title' }, 
+          e('div', { className: 'test-form-title' },
             e('i', { className: 'fas fa-paper-plane' }), ' 发送测试消息'
           ),
           e('button', { className: 'close-btn', onClick: onClose },
@@ -89,12 +91,13 @@
         )
       );
     }
-    
+
     function App() {
       const [robots, setRobots] = React.useState([]);
-      const [form, setForm] = React.useState({name:'', token:'', rate_limit:1});
+      const [form, setForm] = React.useState({ name: '', token: '', rate_limit: 1 });
       const [notification, setNotification] = React.useState({ show: false, message: '', type: 'success' });
       const [testForms, setTestForms] = React.useState({}); // Track which bots have open test forms
+      const [processingBots, setProcessingBots] = React.useState(new Set()); // Track bots being processed
 
       function showNotification(message, type = 'success') {
         setNotification({ show: true, message, type });
@@ -103,7 +106,7 @@
         }, 3000);
       }
 
-      function load(){
+      function load() {
         fetch('/api/robots')
           .then(r => r.json())
           .then(setRobots)
@@ -112,23 +115,23 @@
             showNotification('加载机器人列表失败', 'error');
           });
       }
-      
-      React.useEffect(()=>{load()},[]);
 
-      async function create(){
+      React.useEffect(() => { load() }, []);
+
+      async function create() {
         if (!form.name || !form.token) {
           showNotification('请填写机器人名称和Token', 'error');
           return;
         }
-        
+
         try {
           await fetch('/api/robots', {
-            method:'POST',
-            headers:{'content-type':'application/json'}, 
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
             body: JSON.stringify(form)
           });
-          
-          setForm({name:'', token:'', rate_limit:1});
+
+          setForm({ name: '', token: '', rate_limit: 1 });
           load();
           showNotification('机器人创建成功');
         } catch (err) {
@@ -137,50 +140,65 @@
         }
       }
 
-      async function toggle(id, enabled){
+      async function toggle(id, enabled) {
+        // 如果该机器人正在处理中，则忽略点击事件
+        if (processingBots.has(id)) {
+          return;
+        }
+
+        // 将机器人标记为处理中
+        setProcessingBots(prev => new Set(prev).add(id));
+
         try {
           await fetch(`/api/robots/${id}/toggle`, {
-            method:'POST', 
-            headers:{'content-type':'application/json'}, 
-            body: JSON.stringify({enabled})
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ enabled })
           });
-          
+
           load();
           showNotification(enabled ? '机器人已上线' : '机器人已下线');
         } catch (err) {
           console.error('Failed to toggle robot:', err);
           showNotification('切换机器人状态失败', 'error');
+        } finally {
+          // 处理完成后，从处理中的集合中移除
+          setProcessingBots(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(id);
+            return newSet;
+          });
         }
       }
 
-      async function testSend(bot, chatId, text){
+      async function testSend(bot, chatId, text) {
         try {
           await fetch('/api/control/send', {
-            method:'POST',
-            headers:{
-              'content-type':'application/json',
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
               'Authorization': '1122'
-            }, 
-            body: JSON.stringify({botId: bot.id, chatId, text})
+            },
+            body: JSON.stringify({ botId: bot.id, chatId, text })
           });
-          
+
           // Close the test form after successful send
           setTestForms(prev => {
             const newForms = { ...prev };
             delete newForms[bot.id];
             return newForms;
           });
-          
+
           showNotification('消息已加入队列');
         } catch (err) {
           console.error('Failed to send message:', err);
           showNotification('发送消息失败', 'error');
         }
       }
-      
+
       function deleteRobot(id) {
         if (!confirm('确定要删除这个机器人吗？此操作不可恢复。')) return;
-        
+
         fetch(`/api/robots/${id}`, { method: 'DELETE' })
           .then(() => {
             load();
@@ -201,50 +219,50 @@
       }
 
       return e('div', null,
-        e(Notification, { 
-          message: notification.message, 
-          type: notification.type, 
-          show: notification.show 
+        e(Notification, {
+          message: notification.message,
+          type: notification.type,
+          show: notification.show
         }),
         e('div', { className: 'card' },
           e('h2', null, e('i', { className: 'fas fa-plus-circle' }), ' 添加新机器人'),
           e('div', { className: 'form-group' },
             e('label', { htmlFor: 'name' }, '机器人名称'),
-            e('input', { 
+            e('input', {
               id: 'name',
-              placeholder:'输入机器人名称', 
-              value: form.name, 
-              onChange: (e)=>setForm({...form, name: e.target.value}) 
+              placeholder: '输入机器人名称',
+              value: form.name,
+              onChange: (e) => setForm({ ...form, name: e.target.value })
             })
           ),
           e('div', { className: 'form-group' },
             e('label', { htmlFor: 'token' }, '机器人 Token'),
-            e('input', { 
+            e('input', {
               id: 'token',
-              placeholder:'输入机器人 Token', 
-              value: form.token, 
-              onChange: (e)=>setForm({...form, token: e.target.value}) 
+              placeholder: '输入机器人 Token',
+              value: form.token,
+              onChange: (e) => setForm({ ...form, token: e.target.value })
             })
           ),
           e('div', { className: 'form-group' },
             e('label', { htmlFor: 'rate_limit' }, '速率限制 (消息/秒)'),
-            e('input', { 
+            e('input', {
               id: 'rate_limit',
-              placeholder:'默认为 1', 
-              value: form.rate_limit, 
-              type:'number', 
+              placeholder: '默认为 1',
+              value: form.rate_limit,
+              type: 'number',
               step: '0.1',
               min: '0.1',
-              onChange: (e)=>setForm({...form, rate_limit: parseFloat(e.target.value) || 1}) 
+              onChange: (e) => setForm({ ...form, rate_limit: parseFloat(e.target.value) || 1 })
             })
           ),
-          e('button', { className: 'btn btn-block', onClick: create }, 
+          e('button', { className: 'btn btn-block', onClick: create },
             e('i', { className: 'fas fa-plus' }), ' 新增机器人')
         ),
         e('div', { className: 'card' },
           e('h2', null, e('i', { className: 'fas fa-th-list' }), ' 已配置机器人'),
           e('div', { className: 'robots-grid' },
-            robots.length === 0 ? 
+            robots.length === 0 ?
               e('p', { style: { gridColumn: '1 / -1', textAlign: 'center', padding: '20px' } }, '暂无机器人，请添加一个新的机器人') :
               robots.map(r => e('div', { key: r.id, className: 'robot-card' },
                 e('div', { className: 'robot-header' },
@@ -252,8 +270,8 @@
                     e('div', { className: 'robot-name' }, r.name),
                     e('div', { className: 'robot-id' }, r.id)
                   ),
-                  e('span', { 
-                    className: `robot-status ${r.enabled ? 'status-active' : 'status-inactive'}` 
+                  e('span', {
+                    className: `robot-status ${r.enabled ? 'status-active' : 'status-inactive'}`
                   }, r.enabled ? '在线' : '离线')
                 ),
                 e('div', { className: 'robot-details' },
@@ -267,17 +285,23 @@
                   )
                 ),
                 e('div', { className: 'robot-actions' },
-                  e('button', { 
-                    className: `action-btn btn ${r.enabled ? 'btn-warning' : 'btn-success'}`,
-                    onClick: ()=>toggle(r.id, !r.enabled)
-                  }, r.enabled ? e('i', { className: 'fas fa-power-off' }, ' 下线') : e('i', { className: 'fas fa-plug' }, ' 上线')),
-                  e('button', { 
+                  e('button', {
+                    className: `action-btn btn ${r.enabled ? 'btn-warning' : 'btn-success'} ${processingBots.has(r.id) ? 'btn-disabled' : ''}`,
+                    onClick: () => toggle(r.id, !r.enabled),
+                    disabled: processingBots.has(r.id)
+                  },
+                    processingBots.has(r.id) ?
+                      e('span', null, e('i', { className: 'fas fa-spinner fa-spin' }), r.enabled ?' 下线':' 上线')
+                      :
+                      (r.enabled ? e('i', { className: 'fas fa-power-off' }, ' 下线') : e('i', { className: 'fas fa-plug' }, ' 上线'))
+                  ),
+                  e('button', {
                     className: 'action-btn btn btn-outline',
-                    onClick: ()=>toggleTestForm(r.id)
+                    onClick: () => toggleTestForm(r.id)
                   }, e('i', { className: 'fas fa-paper-plane' }, ' 测试')),
-                  e('button', { 
+                  e('button', {
                     className: 'action-btn btn btn-danger',
-                    onClick: ()=>deleteRobot(r.id)
+                    onClick: () => deleteRobot(r.id)
                   }, e('i', { className: 'fas fa-trash' }, ' 删除'))
                 ),
                 testForms[r.id] && e(TestForm, {
@@ -295,4 +319,5 @@
     ReactDOM.createRoot(document.getElementById('root')).render(e(App));
   </script>
 </body>
+
 </html>

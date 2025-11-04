@@ -3,8 +3,11 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const { getRobotById, db, getMessageMap } = require('./db');
 
 // 新增：代理地址
-const PROXY_URL = process.env.PROXY_URL || 'http://127.0.0.1:10809';
-const proxyAgent = new HttpsProxyAgent(PROXY_URL);
+const PROXY_URL = process.env.PROXY_URL;
+let proxyAgent = null
+if (PROXY_URL) {
+    proxyAgent = new HttpsProxyAgent(PROXY_URL);
+}
 
 // 保持已创建的 bot 实例
 const bots = new Map();
