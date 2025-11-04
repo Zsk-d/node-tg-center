@@ -1,0 +1,545 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>消息队列管理 - Telegram Bot Controller</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="./main.css">
+  <style>
+    .queue-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+      gap: 20px;
+    }
+
+    .queue-card {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+      background: white;
+      transition: var(--transition);
+    }
+
+    .queue-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .queue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .queue-id {
+      font-size: 0.8rem;
+      color: var(--gray-color);
+      font-family: monospace;
+    }
+
+    .queue-status {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .status-created {
+      background-color: rgba(67, 97, 238, 0.2);
+      color: var(--primary-color);
+    }
+
+    .status-failed {
+      background-color: rgba(239, 71, 111, 0.2);
+      color: var(--danger-color);
+    }
+
+    .queue-details {
+      margin: 15px 0;
+    }
+
+    .queue-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .queue-form {
+      background-color: #f8f9fa;
+      border-radius: 6px;
+      padding: 15px;
+      margin-top: 15px;
+      border: 1px solid var(--border-color);
+    }
+
+    .payload-content {
+      background-color: #f8f9fa;
+      border-radius: 6px;
+      padding: 10px;
+      margin: 10px 0;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-item {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .page-btn {
+      padding: 8px 15px;
+      background-color: white;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .page-btn.active {
+      background-color: var(--primary-color);
+      color: white;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1><i class="fas fa-list"></i> 消息队列管理</h1>
+      <p class="subtitle">查看、编辑和管理您的 Telegram 消息队列</p>
+      <div style="margin-top: 15px; text-align: center;">
+        <a href="/admin.html" class="btn" style="text-decoration: none;">
+          <i class="fas fa-list"></i> 机器人管理
+        </a>
+      </div>
+    </header>
+
+    <div id="root"></div>
+  </div>
+
+  <script>
+    const e = React.createElement;
+
+    function Notification({ message, type, show }) {
+      return e('div', {
+        className: `notification ${type} ${show ? 'show' : ''}`
+      }, message);
+    }
+
+    function QueueForm({ queueItem, onClose, onSave, robots }) {
+      const [formData, setFormData] = React.useState({
+        bot_id: queueItem?.bot_id || '',
+        type: queueItem?.type || 'send',
+        payload: queueItem?.payload || JSON.stringify({ chatId: '', text: '' }, null, 2),
+        max_attempts: queueItem?.max_attempts || 5,
+        status: queueItem?.status || 'created'
+      });
+
+      const isEditing = !!queueItem;
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(formData, isEditing ? queueItem.id : null);
+      };
+
+      return e('div', { className: 'queue-form' },
+        e('div', { className: 'test-form-header' },
+          e('div', { className: 'test-form-title' },
+            e('i', { className: isEditing ? 'fas fa-edit' : 'fas fa-plus-circle' }),
+            isEditing ? ' 编辑队列项' : ' 新增队列项'
+          ),
+          e('button', { className: 'close-btn', onClick: onClose },
+            e('i', { className: 'fas fa-times' })
+          )
+        ),
+        e('form', { onSubmit: handleSubmit },
+          // 机器人选择
+          e('div', { className: 'form-row' },
+            e('div', { className: 'form-col' },
+              e('div', { className: 'form-group' },
+                e('label', { htmlFor: 'bot_id' }, '机器人'),
+                e('select', {
+                  id: 'bot_id',
+                  value: formData.bot_id,
+                  onChange: (e) => setFormData({ ...formData, bot_id: e.target.value })
+                },
+                  e('option', { value: '' }, '请选择机器人'),
+                  ...robots.map(robot =>
+                    e('option', { key: robot.id, value: robot.id }, robot.name)
+                  )
+                )
+              )
+            )
+          ),
+
+          // 类型选择
+          e('div', { className: 'form-row' },
+            e('div', { className: 'form-col' },
+              e('div', { className: 'form-group' },
+                e('label', { htmlFor: 'type' }, '类型'),
+                e('select', {
+                  id: 'type',
+                  value: formData.type,
+                  onChange: (e) => setFormData({ ...formData, type: e.target.value })
+                },
+                  e('option', { value: 'send' }, '发送消息'),
+                  e('option', { value: 'edit' }, '编辑消息'),
+                  e('option', { value: 'delete' }, '删除消息'),
+                  e('option', { value: 'pin' }, '置顶消息'),
+                  e('option', { value: 'unpin' }, '取消置顶'),
+                  e('option', { value: 'reply' }, '回复消息'),
+                  e('option', { value: 'react' }, '表情回应'),
+                  e('option', { value: 'file' }, '发送文件')
+                )
+              )
+            )
+          ),
+
+          // 载荷
+          e('div', { className: 'form-row' },
+            e('div', { className: 'form-col' },
+              e('div', { className: 'form-group' },
+                e('label', { htmlFor: 'payload' }, '载荷 (Payload)'),
+                e('textarea', {
+                  id: 'payload',
+                  placeholder: '输入JSON格式的载荷数据',
+                  rows: 6,
+                  value: formData.payload,
+                  onChange: (e) => setFormData({ ...formData, payload: e.target.value })
+                })
+              )
+            )
+          ),
+
+          // 最大尝试次数 & 状态
+          e('div', { className: 'form-row' },
+            e('div', { className: 'form-col' },
+              e('div', { className: 'form-group' },
+                e('label', { htmlFor: 'max_attempts' }, '最大尝试次数'),
+                e('input', {
+                  id: 'max_attempts',
+                  type: 'number',
+                  min: '1',
+                  max: '100',
+                  value: formData.max_attempts,
+                  onChange: (e) => setFormData({ ...formData, max_attempts: parseInt(e.target.value) })
+                })
+              )
+            ),
+            e('div', { className: 'form-col' },
+              e('div', { className: 'form-group' },
+                e('label', { htmlFor: 'status' }, '状态'),
+                e('select', {
+                  id: 'status',
+                  value: formData.status,
+                  onChange: (e) => setFormData({ ...formData, status: e.target.value })
+                },
+                  e('option', { value: 'created' }, '待处理'),
+                  e('option', { value: 'failed' }, '失败')
+                )
+              )
+            )
+          ),
+
+          // 按钮
+          e('button', { className: 'btn btn-block', type: 'submit' },
+            e('i', { className: isEditing ? 'fas fa-save' : 'fas fa-plus' }),
+            isEditing ? ' 保存更改' : ' 添加到队列'
+          )
+        )
+      );
+    }
+
+    function App() {
+      const [queues, setQueues] = React.useState([]);
+      const [robots, setRobots] = React.useState([]);
+      const [notification, setNotification] = React.useState({ show: false, message: '', type: 'success' });
+      const [showForm, setShowForm] = React.useState(false);
+      const [editingItem, setEditingItem] = React.useState(null);
+      const [filters, setFilters] = React.useState({
+        status: '',
+        limit: 20,
+        offset: 0
+      });
+      const [total, setTotal] = React.useState(0);
+
+      function showNotification(message, type = 'success') {
+        setNotification({ show: true, message, type });
+        setTimeout(() => {
+          setNotification(prev => ({ ...prev, show: false }));
+        }, 3000);
+      }
+
+      async function loadRobots() {
+        try {
+          const response = await fetch('/api/robots');
+          const data = await response.json();
+          setRobots(data);
+        } catch (err) {
+          console.error('Failed to load robots:', err);
+          showNotification('加载机器人列表失败', 'error');
+        }
+      }
+
+      async function loadQueues() {
+        try {
+          const params = new URLSearchParams({
+            limit: filters.limit,
+            offset: filters.offset,
+            ...(filters.status && { status: filters.status })
+          });
+
+          const response = await fetch(`/api/system/queue?${params}`);
+          const result = await response.json();
+
+          if (result.ok) {
+            setQueues(result.data);
+            // 获取总数用于分页
+            const countResponse = await fetch(`/api/system/queue?${params}&limit=1&offset=0`);
+            const countResult = await countResponse.json();
+            if (countResult.ok) {
+              setTotal(countResult.data.length); // 这里简化处理，实际应该有专门的计数接口
+            }
+          } else {
+            showNotification('加载队列失败: ' + result.error, 'error');
+          }
+        } catch (err) {
+          console.error('Failed to load queues:', err);
+          showNotification('加载队列失败', 'error');
+        }
+      }
+
+      React.useEffect(() => {
+        loadRobots();
+        loadQueues();
+      }, [filters]);
+
+      async function saveQueue(formData, id = null) {
+        try {
+          // 验证JSON格式
+          JSON.parse(formData.payload);
+
+          const method = id ? 'PUT' : 'POST';
+          const url = id ? `/api/system/queue/${id}` : '/api/system/queue';
+
+          const response = await fetch(url, {
+            method,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              bot_id: formData.bot_id,
+              type: formData.type,
+              payload: formData.payload,
+              max_attempts: formData.max_attempts,
+              ...(id && { status: formData.status }) // 只在编辑时允许更新状态
+            })
+          });
+
+          const result = await response.json();
+
+          if (result.ok) {
+            setShowForm(false);
+            setEditingItem(null);
+            loadQueues();
+            showNotification(id ? '队列项更新成功' : '队列项添加成功');
+          } else {
+            showNotification('操作失败: ' + result.error, 'error');
+          }
+        } catch (err) {
+          if (err instanceof SyntaxError) {
+            showNotification('载荷数据不是有效的JSON格式', 'error');
+          } else {
+            console.error('Failed to save queue:', err);
+            showNotification('保存失败: ' + err.message, 'error');
+          }
+        }
+      }
+
+      async function deleteQueue(id) {
+        if (!confirm('确定要删除这个队列项吗？此操作不可恢复。')) return;
+
+        try {
+          const response = await fetch(`/api/system/queue/${id}`, {
+            method: 'DELETE'
+          });
+
+          const result = await response.json();
+
+          if (result.ok) {
+            loadQueues();
+            showNotification('队列项删除成功');
+          } else {
+            showNotification('删除失败: ' + result.error, 'error');
+          }
+        } catch (err) {
+          console.error('Failed to delete queue:', err);
+          showNotification('删除失败', 'error');
+        }
+      }
+
+      function editQueue(item) {
+        setEditingItem(item);
+        setShowForm(true);
+      }
+
+      function getRobotName(botId) {
+        const robot = robots.find(r => r.id === botId);
+        return robot ? robot.name : '未知机器人';
+      }
+
+      function handlePageChange(newOffset) {
+        setFilters(prev => ({ ...prev, offset: newOffset }));
+      }
+
+      const totalPages = Math.ceil(total / filters.limit);
+      const currentPage = Math.floor(filters.offset / filters.limit) + 1;
+
+      return e('div', null,
+        e(Notification, {
+          message: notification.message,
+          type: notification.type,
+          show: notification.show
+        }),
+        e('div', { className: 'card' },
+          e('h2', null, e('i', { className: 'fas fa-filter' }), ' 筛选'),
+          e('div', { className: 'filter-bar' },
+            e('div', { className: 'filter-item' },
+              e('div', { className: 'form-group' },
+                e('label', { htmlFor: 'status-filter' }, '状态'),
+                e('select', {
+                  id: 'status-filter',
+                  value: filters.status,
+                  onChange: (e) => setFilters({ ...filters, status: e.target.value, offset: 0 })
+                },
+                  e('option', { value: '' }, '全部'),
+                  e('option', { value: 'created' }, '待处理'),
+                  e('option', { value: 'failed' }, '失败')
+                )
+              )
+            ),
+            e('div', { className: 'filter-item' },
+              e('div', { className: 'form-group' },
+                e('label', { htmlFor: 'limit-filter' }, '每页数量'),
+                e('select', {
+                  id: 'limit-filter',
+                  value: filters.limit,
+                  onChange: (e) => setFilters({ ...filters, limit: parseInt(e.target.value), offset: 0 })
+                },
+                  e('option', { value: 10 }, '10'),
+                  e('option', { value: 20 }, '20'),
+                  e('option', { value: 50 }, '50'),
+                  e('option', { value: 100 }, '100')
+                )
+              )
+            )
+          )),
+        e('div', { className: 'card' },
+          e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' } },
+            e('h2', null, e('i', { className: 'fas fa-tasks' }), ' 消息队列'),
+            e('button', {
+              className: 'btn',
+              onClick: () => setShowForm(true)
+            }, e('i', { className: 'fas fa-plus' }), ' 新增队列项')
+          ),
+          showForm && e(QueueForm, {
+            queueItem: editingItem,
+            robots: robots,
+            onClose: () => {
+              setShowForm(false);
+              setEditingItem(null);
+            },
+            onSave: saveQueue
+          }),
+          e('div', { className: 'queue-grid' },
+            queues.length === 0 ?
+              e('p', { style: { gridColumn: '1 / -1', textAlign: 'center', padding: '20px' } }, '暂无队列项') :
+              queues.map(q => e('div', { key: q.id, className: 'queue-card' },
+                e('div', { className: 'queue-header' },
+                  e('div', null,
+                    e('div', { className: 'robot-name' }, getRobotName(q.bot_id)),
+                    e('div', { className: 'queue-id' }, q.id)
+                  ),
+                  e('span', {
+                    className: `queue-status ${q.status === 'created' ? 'status-created' : 'status-failed'}`
+                  }, q.status === 'created' ? '待处理' : '失败')
+                ),
+                e('div', { className: 'queue-details' },
+                  e('div', { className: 'detail-item' },
+                    e('span', { className: 'detail-label' }, '类型:'),
+                    e('span', { className: 'detail-value' }, {
+                      "send": "发送消息",
+                      "edit": "编辑消息",
+                      "delete": "删除消息",
+                      "pin": "置顶消息",
+                      "unpin": "取消置顶",
+                      "reply": "回复消息",
+                      "react": "表情回应",
+                      "file": "发送文件"
+                    }[q.type])
+                  ),
+                  e('div', { className: 'detail-item' },
+                    e('span', { className: 'detail-label' }, '尝试次数:'),
+                    e('span', { className: 'detail-value' }, `${q.attempts}/${q.max_attempts}`)
+                  ),
+                  e('div', { className: 'detail-item' },
+                    e('span', { className: 'detail-label' }, '创建时间:'),
+                    e('span', { className: 'detail-value' }, new Date(q.created_at).toLocaleString())
+                  ),
+                  e('div', { className: 'detail-item' },
+                    e('span', { className: 'detail-label', style:{width: '80px'} }, '载荷:'),
+                    e('div', { className: 'payload-content' }, q.payload)
+                  )
+                ),
+                e('div', { className: 'queue-actions' },
+                  e('button', {
+                    className: 'action-btn btn btn-outline',
+                    onClick: () => editQueue(q)
+                  }, e('i', { className: 'fas fa-edit' }), ' 编辑'),
+                  e('button', {
+                    className: 'action-btn btn btn-danger',
+                    onClick: () => deleteQueue(q.id)
+                  }, e('i', { className: 'fas fa-trash' }), ' 删除')
+                )
+              ))
+          ),
+          totalPages > 1 && e('div', { className: 'pagination' },
+            Array.from({ length: totalPages }, (_, i) => i + 1).map(page =>
+              e('button', {
+                key: page,
+                className: `page-btn ${page === currentPage ? 'active' : ''}`,
+                onClick: () => handlePageChange((page - 1) * filters.limit)
+              }, page)
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+  </script>
+</body>
+
+</html>

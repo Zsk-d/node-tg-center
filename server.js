@@ -6,6 +6,7 @@ const path = require('path');
 const robotsRouter = require('./routes/robots');
 const controlRouter = require('./routes/control');
 const systemRouter = require('./routes/system');
+const messageRouter = require('./routes/message');
 
 const authMiddleware = require('./middleware/auth');
 
@@ -30,6 +31,7 @@ if (env !== 'dev') {
 app.use('/api/robots', robotsRouter);
 app.use('/api/control', controlRouter);
 app.use('/api/system', systemRouter);
+app.use('/api/system', messageRouter);
 
 // admin static page
 app.use('/', express.static(path.join(__dirname, 'public')));
