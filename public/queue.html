@@ -504,12 +504,16 @@
                     e('span', { className: 'detail-label' }, '尝试次数:'),
                     e('span', { className: 'detail-value' }, `${q.attempts}/${q.max_attempts}`)
                   ),
+                  q.last_error ? e('div', { className: 'detail-item' },
+                    e('span', { className: 'detail-label' }, '错误信息:'),
+                    e('span', { className: 'detail-value' }, q.last_error)
+                  ) : null,
                   e('div', { className: 'detail-item' },
                     e('span', { className: 'detail-label' }, '创建时间:'),
                     e('span', { className: 'detail-value' }, new Date(q.created_at).toLocaleString())
                   ),
                   e('div', { className: 'detail-item' },
-                    e('span', { className: 'detail-label', style:{width: '80px'} }, '载荷:'),
+                    e('span', { className: 'detail-label', style: { width: '80px' } }, '载荷:'),
                     e('div', { className: 'payload-content' }, q.payload)
                   )
                 ),
