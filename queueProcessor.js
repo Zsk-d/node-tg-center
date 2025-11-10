@@ -14,8 +14,12 @@ const logger = getLogger(__filename);
  * 转义消息文字
  * @param {*} payload 
  */
-function parseText(text) {
-    return text.replace(/([_*\[\]()~>#+\-=|{}.!\\])/g, '\\$1');
+function parseText(text, format) {
+    if (!format) {
+        return text.replace(/([_*\[\]()~>#+\-=|{}.!\\])/g, '\\$1');
+    }else{
+        return text
+    }
 }
 
 async function processQueueOnce() {
@@ -25,14 +29,14 @@ async function processQueueOnce() {
 
         // 检查是否达到最大重试次数
         const maxAttempts = item.max_attempts || DEFAULT_MAX_ATTEMPTS;
-        
+
         if (item.attempts >= maxAttempts) {
             markAsFailed(item.id, item.last_error || '达到最大重试次数');
             logger.error(`任务[${item.id}]已达到最大重试次数，已标记为失败`);
             continue;
         }
         if (payload.text) {
-            payload.text = parseText(payload.text)
+            payload.text = parseText(payload.text, payload.format)
         }
 
         try {
@@ -69,7 +73,7 @@ async function processQueueOnce() {
                         const buf = Buffer.from(payload.base64_photo, 'base64');
                         sendRes = await sendPhoto(botRecord, payload.chatId, buf, { caption: payload.text });
                     } else {
-                        sendRes = await sendMessage(botRecord, payload.chatId, payload.text, payload.options || {});
+                        sendRes = await sendMessage(botRecord, payload.chatId, payload.text, payload.format, payload.options || {});
                     }
                 } if (item.type === 'file') {
                     const { filePath, originalName, text, format } = JSON.parse(item.payload);

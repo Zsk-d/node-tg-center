@@ -53,13 +53,13 @@ function getOrCreateBot(robotRecord, defaultRate) {
     return bot;
 }
 
-async function sendMessage(botRecord, chatId, text, options = {}) {
+async function sendMessage(botRecord, chatId, text, format, options = {}) {
     const bot = getOrCreateBot(botRecord, parseFloat(process.env.DEFAULT_RATE_LIMIT || 1));
     if (!bot._meta.enabled) throw new Error('bot offline');
 
     if (!bot._meta.limiter.tryRemove()) throw new Error('rate_limited');
     const sendOptions = {
-        parse_mode: 'MarkdownV2', // or 'Markdown' if you prefer old syntax
+        parse_mode: format ? format : 'MarkdownV2', // or 'Markdown' if you prefer old syntax
         ...options,
     };
 

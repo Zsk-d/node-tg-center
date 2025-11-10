@@ -57,12 +57,12 @@ router.post('/:id/toggle', async (req, res) => {
   dbModule.updateRobot({ id, name: r.name, token: r.token, enabled, rate_limit: r.rate_limit });
 
   // 控制机器人监听状态
-  try {
-    await BotController.toggleBotListening(id, enabled);
-  } catch (err) {
-    console.error('Error toggling bot listening state:', err);
-    // 即使控制监听状态失败，也返回更新后的状态
-  }
+  // try {
+  //   await BotController.toggleBotListening(id, enabled);
+  // } catch (err) {
+  //   console.error('Error toggling bot listening state:', err);
+  //   // 即使控制监听状态失败，也返回更新后的状态
+  // }
 
   res.json({ id, enabled });
 });
