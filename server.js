@@ -53,7 +53,7 @@ app.use('/api/system', authMiddleware(API_TOKEN), systemRouter);
 app.use('/api/system', authMiddleware(API_TOKEN), messageRouter);
 
 // admin static page
-app.use('/', basicAuth, express.static(path.join(__dirname, 'public')));
+app.use('/', express.static(path.join(__dirname, 'public')));
 
 
 const port = process.env.PORT || 3000;

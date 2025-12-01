@@ -98,6 +98,7 @@
       const [notification, setNotification] = React.useState({ show: false, message: '', type: 'success' });
       const [testForms, setTestForms] = React.useState({}); // Track which bots have open test forms
       const [processingBots, setProcessingBots] = React.useState(new Set()); // Track bots being processed
+      let auth, token
 
       function showNotification(message, type = 'success') {
         setNotification({ show: true, message, type });
@@ -107,7 +108,10 @@
       }
 
       function load() {
-        fetch('/api/robots')
+        const headers = {}
+        headers[auth] = token;
+
+        fetch('/api/robots', { headers })
           .then(r => r.json())
           .then(setRobots)
           .catch(err => {
@@ -116,7 +120,36 @@
           });
       }
 
-      React.useEffect(() => { load() }, []);
+      React.useEffect(() => {
+        // 检查是否有认证字段
+        let tokenName
+        while (true) {
+          tokenName = localStorage.getItem('API_TOKEN_NAME')
+          token = localStorage.getItem('API_TOKEN')
+          if (!tokenName) {
+            tokenName = prompt('输入API_TOKEN_NAME', '');
+            if (!token) {
+              showNotification('请输入API_TOKEN_NAME', 'error');
+              return;
+            }
+            localStorage.setItem('API_TOKEN_NAME', tokenName);
+          }
+          if (!token) {
+            token = prompt('输入API_TOKEN', '');
+            if (!token) {
+              showNotification('请输入API_TOKEN', 'error');
+              return;
+            }
+            localStorage.setItem('API_TOKEN', token);
+          }
+          if (tokenName && token) {
+            break
+          }
+        }
+        auth = tokenName
+
+        load();
+      }, []);
 
       async function create() {
         if (!form.name || !form.token) {
@@ -125,9 +158,11 @@
         }
 
         try {
+          const headers = {}
+          headers[auth] = token;
           await fetch('/api/robots', {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            headers: { ...headers, 'content-type': 'application/json' },
             body: JSON.stringify(form)
           });
 
@@ -149,10 +184,12 @@
         // 将机器人标记为处理中
         setProcessingBots(prev => new Set(prev).add(id));
 
+        const headers = {}
+        headers[auth] = token;
         try {
           await fetch(`/api/robots/${id}/toggle`, {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            headers: { ...headers, 'content-type': 'application/json' },
             body: JSON.stringify({ enabled })
           });
 
@@ -173,9 +210,12 @@
 
       async function testSend(bot, chatId, text) {
         try {
+          const headers = {}
+          headers[auth] = token;
           await fetch('/api/control/send', {
             method: 'POST',
             headers: {
+              ...headers,
               'content-type': 'application/json',
               'Authorization': '1122'
             },
@@ -199,7 +239,10 @@
       function deleteRobot(id) {
         if (!confirm('确定要删除这个机器人吗？此操作不可恢复。')) return;
 
-        fetch(`/api/robots/${id}`, { method: 'DELETE' })
+        const headers = {}
+        headers[auth] = token;
+
+        fetch(`/api/robots/${id}`, { ...headers, method: 'DELETE' })
           .then(() => {
             load();
             showNotification('机器人删除成功');
@@ -291,7 +334,7 @@
                     disabled: processingBots.has(r.id)
                   },
                     processingBots.has(r.id) ?
-                      e('span', null, e('i', { className: 'fas fa-spinner fa-spin' }), r.enabled ?' 下线':' 上线')
+                      e('span', null, e('i', { className: 'fas fa-spinner fa-spin' }), r.enabled ? ' 下线' : ' 上线')
                       :
                       (r.enabled ? e('i', { className: 'fas fa-power-off' }, ' 下线') : e('i', { className: 'fas fa-plug' }, ' 上线'))
                   ),

@@ -1,8 +1,11 @@
 // middleware/auth.js
-module.exports = function(requiredToken) {
-  return function(req, res, next) {
-    const authHeader = req.headers['auth'] || req.headers['authorization'];
-    
+
+const API_AUTH_HEADER = process.env.API_AUTH_HEADER || 'auth';
+
+module.exports = function (requiredToken) {
+  return function (req, res, next) {
+    const authHeader = req.headers[API_AUTH_HEADER]
+
     if (!authHeader || authHeader !== requiredToken) {
       return res.status(401).json({ ok: false, error: 'Unauthorized' });
     }
