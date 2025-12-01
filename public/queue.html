@@ -286,6 +286,25 @@
         offset: 0
       });
       const [total, setTotal] = React.useState(0);
+      let auth, token;
+
+      let tokenName
+      while (true) {
+        tokenName = localStorage.getItem('API_TOKEN_NAME')
+        token = localStorage.getItem('API_TOKEN')
+        if (!tokenName) {
+          tokenName = prompt('输入API_TOKEN_NAME', '');
+          localStorage.setItem('API_TOKEN_NAME', tokenName);
+        }
+        if (!token) {
+          token = prompt('输入API_TOKEN', '');
+          localStorage.setItem('API_TOKEN', token);
+        }
+        if (tokenName && token) {
+          break
+        }
+      }
+      auth = tokenName
 
       function showNotification(message, type = 'success') {
         setNotification({ show: true, message, type });
@@ -296,7 +315,9 @@
 
       async function loadRobots() {
         try {
-          const response = await fetch('/api/robots');
+          const headers = {}
+          headers[auth] = token;
+          const response = await fetch('/api/robots', { headers });
           const data = await response.json();
           setRobots(data);
         } catch (err) {
@@ -306,6 +327,8 @@
       }
 
       async function loadQueues() {
+        const headers = {}
+        headers[auth] = token;
         try {
           const params = new URLSearchParams({
             limit: filters.limit,
@@ -313,13 +336,13 @@
             ...(filters.status && { status: filters.status })
           });
 
-          const response = await fetch(`/api/system/queue?${params}`);
+          const response = await fetch(`/api/system/queue?${params}`, { headers });
           const result = await response.json();
 
           if (result.ok) {
             setQueues(result.data);
             // 获取总数用于分页
-            const countResponse = await fetch(`/api/system/queue?${params}&limit=1&offset=0`);
+            const countResponse = await fetch(`/api/system/queue?${params}&limit=1&offset=0`, { headers });
             const countResult = await countResponse.json();
             if (countResult.ok) {
               setTotal(countResult.data.length); // 这里简化处理，实际应该有专门的计数接口
@@ -339,6 +362,8 @@
       }, [filters]);
 
       async function saveQueue(formData, id = null) {
+        const headers = {}
+        headers[auth] = token;
         try {
           // 验证JSON格式
           JSON.parse(formData.payload);
@@ -348,7 +373,7 @@
 
           const response = await fetch(url, {
             method,
-            headers: { 'content-type': 'application/json' },
+            headers: { ...headers, 'content-type': 'application/json' },
             body: JSON.stringify({
               bot_id: formData.bot_id,
               type: formData.type,
@@ -379,11 +404,14 @@
       }
 
       async function deleteQueue(id) {
+        const headers = {}
+        headers[auth] = token;
         if (!confirm('确定要删除这个队列项吗？此操作不可恢复。')) return;
 
         try {
           const response = await fetch(`/api/system/queue/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers
           });
 
           const result = await response.json();
