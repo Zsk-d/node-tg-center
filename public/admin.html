@@ -106,18 +106,10 @@
         token = localStorage.getItem('API_TOKEN')
         if (!tokenName) {
           tokenName = prompt('输入API_TOKEN_NAME', '');
-          if (!token) {
-            showNotification('请输入API_TOKEN_NAME', 'error');
-            return;
-          }
           localStorage.setItem('API_TOKEN_NAME', tokenName);
         }
         if (!token) {
           token = prompt('输入API_TOKEN', '');
-          if (!token) {
-            showNotification('请输入API_TOKEN', 'error');
-            return;
-          }
           localStorage.setItem('API_TOKEN', token);
         }
         if (tokenName && token) {
