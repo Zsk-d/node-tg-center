@@ -98,7 +98,33 @@
       const [notification, setNotification] = React.useState({ show: false, message: '', type: 'success' });
       const [testForms, setTestForms] = React.useState({}); // Track which bots have open test forms
       const [processingBots, setProcessingBots] = React.useState(new Set()); // Track bots being processed
-      let auth, token
+      let auth, token;
+
+      let tokenName
+      while (true) {
+        tokenName = localStorage.getItem('API_TOKEN_NAME')
+        token = localStorage.getItem('API_TOKEN')
+        if (!tokenName) {
+          tokenName = prompt('输入API_TOKEN_NAME', '');
+          if (!token) {
+            showNotification('请输入API_TOKEN_NAME', 'error');
+            return;
+          }
+          localStorage.setItem('API_TOKEN_NAME', tokenName);
+        }
+        if (!token) {
+          token = prompt('输入API_TOKEN', '');
+          if (!token) {
+            showNotification('请输入API_TOKEN', 'error');
+            return;
+          }
+          localStorage.setItem('API_TOKEN', token);
+        }
+        if (tokenName && token) {
+          break
+        }
+      }
+      auth = tokenName
 
       function showNotification(message, type = 'success') {
         setNotification({ show: true, message, type });
@@ -122,31 +148,7 @@
 
       React.useEffect(() => {
         // 检查是否有认证字段
-        let tokenName
-        while (true) {
-          tokenName = localStorage.getItem('API_TOKEN_NAME')
-          token = localStorage.getItem('API_TOKEN')
-          if (!tokenName) {
-            tokenName = prompt('输入API_TOKEN_NAME', '');
-            if (!token) {
-              showNotification('请输入API_TOKEN_NAME', 'error');
-              return;
-            }
-            localStorage.setItem('API_TOKEN_NAME', tokenName);
-          }
-          if (!token) {
-            token = prompt('输入API_TOKEN', '');
-            if (!token) {
-              showNotification('请输入API_TOKEN', 'error');
-              return;
-            }
-            localStorage.setItem('API_TOKEN', token);
-          }
-          if (tokenName && token) {
-            break
-          }
-        }
-        auth = tokenName
+
 
         load();
       }, []);
@@ -184,6 +186,7 @@
         // 将机器人标记为处理中
         setProcessingBots(prev => new Set(prev).add(id));
 
+        debugger
         const headers = {}
         headers[auth] = token;
         try {
